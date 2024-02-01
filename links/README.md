@@ -1,0 +1,1 @@
+Default output destination. With no options, scripts will create links in this directory.
