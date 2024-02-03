@@ -1,10 +1,13 @@
+# To use -Verbose and -Debug parameters
+[CmdletBinding()]
 param (
     [string]$SteamDirectory = 'C:\Program Files (x86)\Steam',
     [string]$Destination = "$PSScriptRoot\links",
     [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
-    [switch]$Verbose,
     [switch]$OverwriteLink
 )
+$Verbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose']
+$Debug = $PSCmdlet.MyInvocation.BoundParameters['Debug']
 
 # Save the current encoding and switch to UTF-8.
 # To treat these characters correctly: ™, ひらがな
@@ -59,8 +62,8 @@ function Get-Game-Info {
         Continue
     }
     Write-Host ('Receive a response successfully.')
-    if ( $Verbose ) {
-        $Result
+    if ( $Verbose -or $Debug ) {
+        Write-Debug $Result
     }
     Return $Result
 }
