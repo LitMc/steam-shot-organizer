@@ -118,7 +118,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
 
     # Id Example: 400
     $Id = ($GameIdDirectory | Select-Object Name).Name
-    $Result = Get-Game-Info ( $Id )
+    $Result = Get-Game-Info -Id $Id
 
     # $QueryGameTitle has double quotes to be removed
     $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
@@ -128,7 +128,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     Write-Host "Game title: $Title"
 
     # Remove invalid characters for a file name from title
-    $SanitizedTitle = Get-SanitizedTitle ( $Title )
+    $SanitizedTitle = Get-SanitizedTitle -Title $Title
 
     $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
 
