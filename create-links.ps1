@@ -3,7 +3,7 @@ param (
     [string]$Destination = "$PSScriptRoot\links",
     [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
     [switch]$Verbose,
-    [switch]$Force
+    [switch]$OverwriteLink
 )
 
 # Save the current encoding and switch to UTF-8.
@@ -115,7 +115,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     $DestinationLinkPath = Join-Path -Path $Destination -ChildPath $SanitizedTitle
     if ( ( Test-Path -Path $DestinationLinkPath ) ) {
         Write-Warning "A symbolic link ""$DestinationLinkPath"" already exists."
-        if ( $Force ) {
+        if ( $OverwriteLink ) {
             Write-Host 'Overwrite a link with a new one.'
             Write-Host "Old source : ""$((Get-Item $DestinationLinkPath).LinkTarget)"""
             Write-Host "New source : ""$SourceScreenshotPath"""
@@ -130,7 +130,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     }
 
     # Create a symbolic link
-    if ( $Force ) {
+    if ( $OverwriteLink ) {
         $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath -Force
     } else {
         $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath
