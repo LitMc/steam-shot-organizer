@@ -43,6 +43,28 @@ function Get-SanitizedTitle {
     Return $SanitizedTitle
 }
 
+# Retrieve game info such as title and banner image URL from Steam Web API
+function Get-Game-Info {
+    param(
+        [string] $Id
+    )
+    $RequestUri = "https://store.steampowered.com/api/appdetails?appids=$Id"
+    Write-Host "Invoke a web request to: $RequestUri"
+
+    # no-cache: Avoid regional restriction (Example: NiGHTS into Dreams)
+    $Result = Invoke-WebRequest -Uri $RequestUri -Headers @{'Cache-Control' = 'no-cache' } 
+    $IsQuerySuccess = ([string]::Format('."{0}".success', $Id))
+    if ( ( $Result.Content | jq $IsQuerySuccess ) -ne 'true' ) {
+        Write-Warning ("Received non successful response. Skip processing: $Id")
+        Continue
+    }
+    Write-Host ('Receive a response successfully.')
+    if ( $Verbose ) {
+        $Result
+    }
+    Return $Result
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
@@ -78,20 +100,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
 
     # Id Example: 400
     $Id = ($GameIdDirectory | Select-Object Name).Name
-    $RequestUri = "https://store.steampowered.com/api/appdetails?appids=$Id"
-    Write-Host "Invoke a web request to: $RequestUri"
-
-    # no-cache: Avoid regional restriction (Example: NiGHTS into Dreams)
-    $Result = Invoke-WebRequest -Uri $RequestUri -Headers @{'Cache-Control' = 'no-cache' } 
-    $IsQuerySuccess = ([string]::Format('."{0}".success', $Id))
-    if ( ( $Result.Content | jq $IsQuerySuccess ) -ne 'true' ) {
-        Write-Warning ("Received non successful response. Skip processing: $Id")
-        Continue
-    }
-    Write-Host ('Receive a response successfully.')
-    if ( $Verbose ) {
-        $Result
-    }
+    $Result = Get-Game-Info ( $Id )
 
     # $QueryGameTitle has double quotes to be removed
     $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
