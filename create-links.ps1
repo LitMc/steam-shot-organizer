@@ -1,7 +1,9 @@
 param (
-    [string]$SteamDirectory = "C:\Program Files (x86)\Steam",
+    [string]$SteamDirectory = 'C:\Program Files (x86)\Steam',
     [string]$Destination = "$PSScriptRoot\links",
-    [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath "userdata\*\760\remote")
+    [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
+    [switch]$Verbose,
+    [switch]$Force
 )
 
 # Save the current encoding and switch to UTF-8.
@@ -11,9 +13,9 @@ $PrevEncoding = [Console]::OutputEncoding
 
 # Default parameter values
 $Defaults = @{
-    SteamDirectory = "C:\Program Files (x86)\Steam"
+    SteamDirectory = 'C:\Program Files (x86)\Steam'
     Destination    = "$PSScriptRoot\links"
-    Source         = (Join-Path -Path $SteamDirectory -ChildPath "userdata\*\760\remote")
+    Source         = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote')
 }
 
 function Exit-With-Error {
@@ -28,96 +30,119 @@ function Exit-With-Success {
     exit 0
 }
 
+function Get-SanitizedTitle {
+    param(
+        [string] $Title
+    )
+    $InvalidCharsRegex = '[{0}]' -f ([System.IO.Path]::GetInvalidFileNameChars() -join '')
+    $SanitizedTitle = $Title -replace $InvalidCharsRegex
+    if ( $SanitizedTitle -ne $Title ) {
+        Write-Warning "Title ""$Title"" contains invalid characters for a file name."
+        Write-Warning "Remove invalid characters. Sanitized title: $SanitizedTitle"
+    }
+    Return $SanitizedTitle
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
 Write-Host "[inputs] Destination symbolic links directory: $Destination"
 
-# Check steam directory exists
-$ResolvedSteamDirectory = Resolve-Path -Path $SteamDirectory
-if ( $null -eq $ResolvedSteamDirectory ) {
+# Check a steam directory exists
+if ( -not ( Test-Path -Path $SteamDirectory ) ) {
     Write-Error "Cannot find Steam directory: $SteamDirectory"
-    Write-Error "Please confirm the directory $SteamDirectory can be opened with Explorer"
+    Write-Error "Please confirm the directory ""$SteamDirectory"" can be opened with Explorer"
     Exit-With-Error
 }
 
-# Check steam screenshots directory exists
-$ResolvedSource = Resolve-Path -Path $Source
-if ( $null -eq $ResolvedSource ) {
+# Check a steam screenshots directory exists
+if ( -not ( Test-Path -Path $Source ) ) {
     Write-Error "Cannot find Steam screenshots directory: $Source"
     if ( $Source -eq $defaults.Source ) {
-        Write-Error "Please confirm Steam directory '$SteamDirectory' has 'userdata\{some numbers}\760\remote' directories in it."
-    }
-    else {
-        Write-Error "Please confirm the directory $Source can be opened with Explorer."
+        Write-Error "Please confirm the Steam directory ""$SteamDirectory"" has ""userdata\{some numbers}\760\remote"" directories in it."
+    } else {
+        Write-Error "Please confirm the directory ""$Source"" can be opened with Explorer."
     }
     Exit-With-Error
 }
-Write-Host "Actual source screenshots directory: $ResolvedSource"
-Write-Host ""
-Write-Host "Start mapping id to game title"
-# Example: C:\Program Files (x86)\Steam\userdata\{some numbers}\760\remote\400
-foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
-    Write-Host ""
-    Write-Host ("Target: {0}" -f $GameIdDirectory.FullName) -ForegroundColor DarkCyan
 
-    # Example: 400
+$ResolvedSource = Resolve-Path -Path $Source
+Write-Host "Actual source screenshots directory: $ResolvedSource"
+Write-Host ''
+Write-Host 'Start mapping id to game title...'
+
+# GameIdDirectory Example: C:\Program Files (x86)\Steam\userdata\{some numbers}\760\remote\400
+foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
+    Write-Host ''
+    Write-Host ('Target: {0}' -f $GameIdDirectory.FullName) -ForegroundColor DarkCyan
+
+    # Id Example: 400
     $Id = ($GameIdDirectory | Select-Object Name).Name
     $RequestUri = "https://store.steampowered.com/api/appdetails?appids=$Id"
-    Write-Host "Invoke web request to: $RequestUri"
+    Write-Host "Invoke a web request to: $RequestUri"
 
     # no-cache: Avoid regional restriction (Example: NiGHTS into Dreams)
-    $Result = Invoke-WebRequest -Uri $RequestUri -Headers @{"Cache-Control"="no-cache"} 
-    $QueryIsSuccess = ([string]::Format(".""{0}"".success", $Id))
-    if ( ( $Result.Content | jq $QueryIsSuccess ) -ne "true" ) {
+    $Result = Invoke-WebRequest -Uri $RequestUri -Headers @{'Cache-Control' = 'no-cache' } 
+    $IsQuerySuccess = ([string]::Format('."{0}".success', $Id))
+    if ( ( $Result.Content | jq $IsQuerySuccess ) -ne 'true' ) {
         Write-Warning ("Received non successful response. Skip processing: $Id")
         Continue
     }
-    Write-Host ("Receive response successfully. ")
-    
-    $Result
-    $QueryGameTitle = ([string]::Format(".""{0}"".data.name", $Id))
-    # .{ID}.data.name element has double quote to be removed
+    Write-Host ('Receive a response successfully.')
+    if ( $Verbose ) {
+        $Result
+    }
+
+    # $QueryGameTitle has double quotes to be removed
+    $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
     # Example: "Portal" -> Portal
-    $Title = ($Result.Content | jq $QueryGameTitle) -replace """"
+    $Title = ($Result.Content | jq $QueryGameTitle) -replace '"'
     Write-Host "Game ID   : $Id"
     Write-Host "Game title: $Title"
 
     # Remove invalid characters for a file name from title
-    $InvalidCharsRegex = "[{0}]" -f ([System.IO.Path]::GetInvalidFileNameChars() -join '')
-    $SanitizedTitle = $Title -replace $InvalidCharsRegex
-    if ( $SanitizedTitle -ne $Title ) {
-        Write-Warning "Title $Title contains invalid characters for a file name."
-        Write-Warning "Remove invalid characters for a file name. Sanitized title: $SanitizedTitle"
-    }
+    $SanitizedTitle = Get-SanitizedTitle ( $Title )
 
-    # Create symbolic link
-    # Skip creating symbolic link if a source directory does not exist
-    $SourceScreenshotPath = Join-Path -Path $GameIdDirectory -ChildPath "screenshots"
+    # Skip creating a link if a source directory does not exist
+    $SourceScreenshotPath = Join-Path -Path $GameIdDirectory -ChildPath 'screenshots'
     if ( -not ( Test-Path -Path $SourceScreenshotPath ) ) {
         Write-Warning ("Cannot find source screenshots directory: $SourceScreenshotPath")
         Write-Warning ("Skip processing: $Id")
         Continue
     }
 
+    # Skip creating a symbolic link if a destination link already exists
     $DestinationLinkPath = Join-Path -Path $Destination -ChildPath $SanitizedTitle
-    # Skip creating symbolic link if a destination link already exists
     if ( ( Test-Path -Path $DestinationLinkPath ) ) {
-        Write-Warning "Symbolic link $DestinationLinkPath is already exists."
-        Write-Warning ("Skip processing: $Id")
-        Continue
+        Write-Warning "A symbolic link ""$DestinationLinkPath"" already exists."
+        if ( $Force ) {
+            Write-Host 'Overwrite a link with a new one.'
+            Write-Host "Old source : ""$((Get-Item $DestinationLinkPath).LinkTarget)"""
+            Write-Host "New source : ""$SourceScreenshotPath"""
+            Write-Host "Destination: ""$DestinationLinkPath"""
+        } else {
+            Write-Warning ("Skip processing: $Id")
+            Continue
+        }
+    } else {
+        Write-Host "Source     : $SourceScreenshotPath"
+        Write-Host "Destination: $DestinationLinkPath"
     }
-    Write-Host "Source     : $SourceScreenshotPath"
-    Write-Host "Destination: $DestinationLinkPath"  
 
-    if ( New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath ) {
-        Write-Host "Create symbolic link successfully: $DestinationLinkPath" -ForegroundColor DarkGreen
+    # Create a symbolic link
+    if ( $Force ) {
+        $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath -Force
+    } else {
+        $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath
     }
-    else {
-        Write-Error "Cannot create symbolic link: $DestinationLinkPath"
-        Write-Error "Please confirm the directory $Destination can be opened with Explorer."
+
+    if ( $LinkResult ) {
+        Write-Host "Create a symbolic link successfully: $DestinationLinkPath" -ForegroundColor DarkGreen
+    } else {
+        Write-Error "Cannot create a symbolic link: $DestinationLinkPath"
+        Write-Error "Please confirm the directory ""$Destination"" can be opened with Explorer."
         Exit-With-Error
     }
 }
-Write-Host "Finish mapping game IDs to game titles"
+Write-Host 'Finish mapping game IDs to game titles'
 Exit-With-Success
