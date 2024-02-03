@@ -68,6 +68,21 @@ function Get-Game-Info {
     Return $Result
 }
 
+function Get-SourceScreenshotPath {
+    param(
+        [string] $Id,
+        $GameIdDirectory
+    )
+    # Skip creating a link if a source directory does not exist
+    $SourceScreenshotPath = Join-Path -Path $GameIdDirectory -ChildPath 'screenshots'
+    if ( -not ( Test-Path -Path $SourceScreenshotPath ) ) {
+        Write-Warning ("Cannot find source screenshots directory: $SourceScreenshotPath")
+        Write-Warning ("Skip processing: $Id")
+        Continue
+    }
+    Return $SourceScreenshotPath
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
@@ -115,13 +130,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     # Remove invalid characters for a file name from title
     $SanitizedTitle = Get-SanitizedTitle ( $Title )
 
-    # Skip creating a link if a source directory does not exist
-    $SourceScreenshotPath = Join-Path -Path $GameIdDirectory -ChildPath 'screenshots'
-    if ( -not ( Test-Path -Path $SourceScreenshotPath ) ) {
-        Write-Warning ("Cannot find source screenshots directory: $SourceScreenshotPath")
-        Write-Warning ("Skip processing: $Id")
-        Continue
-    }
+    $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
 
     # Skip creating a symbolic link if a destination link already exists
     $DestinationLinkPath = Join-Path -Path $Destination -ChildPath $SanitizedTitle
