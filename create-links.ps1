@@ -4,10 +4,26 @@ param (
     [string]$SteamDirectory = 'C:\Program Files (x86)\Steam',
     [string]$Destination = "$PSScriptRoot\links",
     [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
-    [switch]$OverwriteLink
+    [string]$Config = "$PSScriptRoot\config.yaml",
+    [switch]$OverwriteLink,
+    [switch]$OverwriteConfig
 )
 $Verbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose']
 $Debug = $PSCmdlet.MyInvocation.BoundParameters['Debug']
+
+$DefaultConfigYamlText = @'
+# Configuration structure
+# {Game ID}:
+#   title: {Game title}
+
+# Example
+# "70":
+#   title: Half-Life
+# "400":
+#   title: Portal
+
+# Write here the ones you would like to define
+'@
 
 # Save the current encoding and switch to UTF-8.
 # To treat these characters correctly: ™, ひらがな
@@ -83,10 +99,53 @@ function Get-SourceScreenshotPath {
     Return $SourceScreenshotPath
 }
 
+function Get-ConfigFromYaml {
+    param (
+        [string]$Config
+    )
+    try {
+        $ParsedConfig = Get-Content -Path $Config -Raw | ConvertFrom-Yaml -Ordered
+    } catch {
+        Write-Error 'Cannot load config.yaml.'
+        Write-Error 'Please check that config.yaml format is valid.'
+        Write-Error 'Visit: https://www.yamllint.com/ (or use any other yaml lint tools)'
+        Write-Error 'Paste whole texts of config.yaml to textbox and click ''Go''.'
+        Exit-With-Error
+    }
+    
+    if ( $null -eq $ParsedConfig ) {
+        Write-Host "Detected no user-defined settings in ""$Config""."
+        Write-Host 'All game IDs will have their titles resolved by the Steam Web API.'
+        $ParsedConfig = @{}
+    }
+    Return $ParsedConfig
+}
+
+function Set-ConfigToYaml {
+    param(
+        [PSCustomObject]$ParsedConfig
+    )
+    if ( ( $null -ne $ParsedConfig ) -and ($ParsedConfig.Count -eq 0 ) ) {
+        # To avoid writing '{}' to config.yaml when $ParsedConfig is an empty map
+        $ParsedConfig = $null
+    }
+    if ( $OverwriteConfig ) {
+        $DefaultConfigYamlText | Set-Content -Path $Config
+        ConvertTo-Yaml -Data $ParsedConfig | Add-Content $Config
+        Write-Host "Config is successfully written to ""$Config""."
+    } else {
+        Write-Host "Skipped writing config to ""$Config"". Use -OverwriteConfig if you want to overwrite it."
+    }
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
 Write-Host "[inputs] Destination symbolic links directory: $Destination"
+Write-Host "[inputs] ID:Title map config file            : $Config"
+
+# Load id:title mappings from a config yaml file
+$ParsedConfig = Get-ConfigFromYaml -Config $Config
 
 # Check a steam directory exists
 if ( -not ( Test-Path -Path $SteamDirectory ) ) {
@@ -166,5 +225,9 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
         Exit-With-Error
     }
 }
-Write-Host 'Finish mapping game IDs to game titles'
+Write-Host 'Finished mapping game IDs to game titles.'
+
+# Write id:title mappings to a config yaml file
+Set-ConfigToYaml -ParsedConfig $ParsedConfig
+
 Exit-With-Success
