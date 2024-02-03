@@ -130,6 +130,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     # Remove invalid characters for a file name from title
     $SanitizedTitle = Get-SanitizedTitle -Title $Title
 
+    # Get and test SourceScreenshotPath
     $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
 
     # Skip creating a symbolic link if a destination link already exists
