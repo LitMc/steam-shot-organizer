@@ -142,14 +142,21 @@ function Get-Game-Title {
     param(
         [string]$Id
     )
+    if ( $ParsedConfig.Contains($Id) -and $ParsedConfig[$Id].Contains('title') ) {
+        Write-Host ("Found a title in config. ID: ""$Id"" Title: {0}" -f $ParsedConfig[$Id]['title'].ToString())
+        Return $ParsedConfig[$Id]['title']
+    }
     $Result = Get-Game-Info -Id $Id
-
     # $QueryGameTitle has double quotes to be removed
     $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
     # Example: "Portal" -> Portal
     $Title = ($Result.Content | jq $QueryGameTitle) -replace '"'
     Write-Host "Game ID   : $Id"
     Write-Host "Game title: $Title"
+    if ( -not $ParsedConfig.Contains($Id) ) {
+        $ParsedConfig[$Id] = @{}
+    }
+    $ParsedConfig[$Id]['title'] = $Title
     Return $Title
 }
 
