@@ -63,7 +63,7 @@ function Get-SanitizedTitle {
 }
 
 # Retrieve game info such as title and banner image URL from Steam Web API
-function Get-Game-Info {
+function Get-GameInfo {
     param(
         [string] $Id
     )
@@ -138,7 +138,7 @@ function Set-ConfigToYaml {
     }
 }
 
-function Get-Game-Title {
+function Get-GameTitle {
     param(
         [string]$Id
     )
@@ -146,7 +146,7 @@ function Get-Game-Title {
         Write-Host ("Found a title in config. ID: ""$Id"" Title: {0}" -f $ParsedConfig[$Id]['title'].ToString())
         Return $ParsedConfig[$Id]['title']
     }
-    $Result = Get-Game-Info -Id $Id
+    $Result = Get-GameInfo -Id $Id
     # $QueryGameTitle has double quotes to be removed
     $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
     # Example: "Portal" -> Portal
@@ -201,7 +201,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     $Id = ($GameIdDirectory | Select-Object Name).Name
 
     # Title Example: Portal
-    $Title = Get-Game-Title -Id $Id
+    $Title = Get-GameTitle -Id $Id
 
     # Remove invalid characters for a file name from title
     $SanitizedTitle = Get-SanitizedTitle -Title $Title
