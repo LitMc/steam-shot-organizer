@@ -138,6 +138,21 @@ function Set-ConfigToYaml {
     }
 }
 
+function Get-Game-Title {
+    param(
+        [string]$Id
+    )
+    $Result = Get-Game-Info -Id $Id
+
+    # $QueryGameTitle has double quotes to be removed
+    $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
+    # Example: "Portal" -> Portal
+    $Title = ($Result.Content | jq $QueryGameTitle) -replace '"'
+    Write-Host "Game ID   : $Id"
+    Write-Host "Game title: $Title"
+    Return $Title
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
@@ -177,14 +192,9 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
 
     # Id Example: 400
     $Id = ($GameIdDirectory | Select-Object Name).Name
-    $Result = Get-Game-Info -Id $Id
 
-    # $QueryGameTitle has double quotes to be removed
-    $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
-    # Example: "Portal" -> Portal
-    $Title = ($Result.Content | jq $QueryGameTitle) -replace '"'
-    Write-Host "Game ID   : $Id"
-    Write-Host "Game title: $Title"
+    # Title Example: Portal
+    $Title = Get-Game-Title -Id $Id
 
     # Remove invalid characters for a file name from title
     $SanitizedTitle = Get-SanitizedTitle -Title $Title
