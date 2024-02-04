@@ -1,0 +1,12 @@
+# Configuration structure
+# {Game ID}:
+#   title: {Game title}
+
+# Example
+# "70":
+#   title: Half-Life
+# "400":
+#   title: Portal
+
+# Write here the ones you would like to define
+
