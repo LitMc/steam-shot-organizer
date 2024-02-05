@@ -1,13 +1,9 @@
-# To use -Verbose and -Debug parameters
-[CmdletBinding()]
 param (
     [string]$InputDirectory = (Join-Path $PSScriptRoot -ChildPath 'icon_source_images'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot -ChildPath 'icons'),
     [string]$Config = "$PSScriptRoot\config.yaml",
     [switch]$OverwriteIcon
 )
-$Verbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose']
-$Debug = $PSCmdlet.MyInvocation.BoundParameters['Debug']
 
 # Test a path and print some messages
 function Test-Path-Verbose {
