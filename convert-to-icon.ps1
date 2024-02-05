@@ -1,5 +1,5 @@
 param (
-    [string]$InputDirectory = (Join-Path $PSScriptRoot -ChildPath 'icon_source_images'),
+    [string]$InputDirectory = (Join-Path $PSScriptRoot -ChildPath 'images'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot -ChildPath 'icons'),
     [string]$Config = "$PSScriptRoot\config.yaml",
     [switch]$OverwriteIcon
