@@ -54,10 +54,10 @@ If any of these are defined in `config.yaml`, the ones in `config.yaml` will tak
 # Example
 "70":
   title: Half-Life
-  image: "path\to\half-life.jpg"
+  image: 'path\to\half-life.jpg'
 "400":
   title: Portal
-  image: "path\to\portal-banner.png"
+  image: 'path\to\portal-banner.png'
 
 # Write here the ones you would like to define
 ```
