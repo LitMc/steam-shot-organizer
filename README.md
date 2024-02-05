@@ -6,6 +6,9 @@ It aggregates screenshots from screenshots directories into a single location wh
 Some softwares have to be installed to run scripts.
 Since there are no dependency management tools, you need install them manually. I am sorry for that.
 
+### Install requirements (TBD)
+
+### Clone this repository
 ```
 git clone https://github.com/LitMc/steam-shot-organizer.git
 cd steam-shot-organizer
@@ -16,26 +19,26 @@ To run scripts, you have to launch a PowerShell console as Administrator because
 
 ### Create shortcuts and retrieve game information
 ```
-> .\create-shortcuts.ps1
+.\create-shortcuts.ps1
 ```
 
 ### Convert images to icon (\*.ico) files
 ```
-> .\convert-to-icons.ps1
+.\convert-to-icons.ps1
 ```
 
 ### Set icons to the shortcuts
 ```
-> .\set-icons.ps1
+.\set-icons.ps1
 ```
 > [!CAUTION]
-> This script modifies system files like `desktop.ini` to customize icons of Steam screenshots folders.
+> `set-icons.ps1` modifies system files like `desktop.ini` to customize icons of Steam screenshots folders.
 > If you have already modified `desktop.ini` of these folders, they are all overwritten by running `set-icons.ps1`.
 
 ### Configuration
 You can define game titles and images for shortcuts in `config.yaml`.
-By default, the game name and image are taken from the Steam Web API or the local Steam library cache,
-If any of these are defined in `config.yaml`, they will take precedence.
+By default, they are taken from the Steam Web API or the local Steam library cache,
+If any of these are defined in `config.yaml`, the ones in `config.yaml` will take precedence.
 
 - You can use `config.yaml` to create shortcuts for 
   - non-Steam games
