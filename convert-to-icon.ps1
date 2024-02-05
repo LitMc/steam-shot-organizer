@@ -34,12 +34,13 @@ foreach ( $ImageFile in Get-ChildItem $InputDirectory ) {
     $IconName = "$Id.ico"
     $InputFrom = $ImageFileItem.FullName
     $OutputTo = Join-Path $OutputDirectory -ChildPath $IconName
-    if ( $OverwriteIcon -and ( Test-Path-Verbose -Path $OutputTo) ) {
-        Write-Warning "Skipped converting ""$OutputTo"". It already exists."
+    if ( ( -not $OverwriteIcon ) -and ( Test-Path-Verbose -Path $OutputTo ) ) {
+        Write-Warning "Skipped converting ""$InputFrom"" to ""$OutputTo"". It already exists."
         Write-Warning 'Use -OverwriteIcon if you want to overwrite icons.'
         Continue
     }
     magick $InputFrom -resize 256x256 -background transparent -gravity center -extent 256x256 $OutputTo
+    Write-Host "Finished converting: $InputFrom"
 }
 
 Write-Host 'Finished converting images to *.ico files.'
