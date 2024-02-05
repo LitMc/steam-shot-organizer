@@ -282,10 +282,10 @@ function Get-Image {
 }
 
 # Print parameters to console
-Write-Host "[inputs] Steam directory                     : $SteamDirectory"
-Write-Host "[inputs] Source screenshots directory        : $Source"
-Write-Host "[inputs] Destination symbolic links directory: $Destination"
-Write-Host "[inputs] ID:Title map config file            : $Config"
+Write-Host "[inputs] Steam directory                : $SteamDirectory"
+Write-Host "[inputs] Source screenshots directory   : $Source"
+Write-Host "[inputs] Destination shortcuts directory: $Destination"
+Write-Host "[inputs] ID:Title map config file       : $Config"
 
 # Load id:title mappings from a config yaml file
 $ParsedConfig = Get-ConfigFromYaml -Config $Config
@@ -338,10 +338,10 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     # Get and test SourceScreenshotPath
     $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
 
-    # Skip creating a symbolic link if a destination link already exists
+    # Skip creating a shortcuts if a destination link already exists
     $DestinationLinkPath = Join-Path -Path $Destination -ChildPath $SanitizedTitle
     if ( ( Test-Path -Path $DestinationLinkPath ) ) {
-        Write-Warning "A symbolic link ""$DestinationLinkPath"" already exists."
+        Write-Warning "A shortcuts ""$DestinationLinkPath"" already exists."
         if ( $OverwriteLink ) {
             Write-Host 'Overwrite a link with a new one.'
             Write-Host "Old source : ""$((Get-Item $DestinationLinkPath).LinkTarget)"""
@@ -356,7 +356,7 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
         Write-Host "Destination: $DestinationLinkPath"
     }
 
-    # Create a symbolic link
+    # Create a shortcuts
     if ( $OverwriteLink ) {
         $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath -Force
     } else {
@@ -364,9 +364,9 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     }
 
     if ( $LinkResult ) {
-        Write-Host "Create a symbolic link successfully: $DestinationLinkPath" -ForegroundColor DarkGreen
+        Write-Host "Create a shortcuts successfully: $DestinationLinkPath" -ForegroundColor DarkGreen
     } else {
-        Write-Error "Cannot create a symbolic link: $DestinationLinkPath"
+        Write-Error "Cannot create a shortcuts: $DestinationLinkPath"
         Write-Error "Please confirm the directory ""$Destination"" can be opened with Explorer."
         Exit-With-Error
     }
