@@ -208,13 +208,22 @@ function Get-ImageFromConfig {
  
     Write-Host 'Found an icon image path in config.'
     Write-Host ('Image: {0}' -f $ParsedConfig[$Id]['image'])
-    $ReturnPath = $ParsedConfig[$Id]['image'].ToString()
-    if ( -not ( Test-Path -Path $ReturnPath ) ) {
-        Write-Error "Cannot find an icon source image at ""$ReturnPath""."
-        Write-Error "Please confirm ""$ReturnPath"" can be opened with Explorer."
+    $LibraryImagePath = $ParsedConfig[$Id]['image'].ToString()
+    if ( -not ( Test-Path -Path $LibraryImagePath ) ) {
+        Write-Error "Cannot find an icon source image at ""$LibraryImagePath""."
+        Write-Error "Please confirm ""$LibraryImagePath"" can be opened with Explorer."
         Return $null
     }
-    Return $ReturnPath
+    $CopyTo = Join-Path -Path $SaveImagesTo -ChildPath "$Id.jpg"
+    if ( ( -not  $OverwriteImage ) -and ( Test-Path-Verbose -Path $CopyTo ) ) {
+        Write-Warning "Skipped overwriting ""$CopyTo"" with ""$LibraryImagePath""."
+        Write-Warning 'Use -OverwriteImage if you want to overwrite images.'
+        Return $CopyTo
+    }
+    if ( $LibraryImagePath -ne $CopyTo ) {
+        Copy-Item $LibraryImagePath -Destination $CopyTo
+    }
+    Return $CopyTo
 }
 
 # Retrieve an icon image from Steam local library cache
@@ -222,17 +231,18 @@ function Get-ImageFromSteamLibrary {
     param(
         [string]$Id
     )
-    # Almost all games have this 600x900 Portrait image
-    $ImageName = '{0}_library_600x900.jpg' -f $Id
+    # Almost all games have a 600x900 Portrait image
+    # Some titles have filename like '{Game ID}_library_600x900_{Language}.jpg'
+    $ImageName = '{0}_library_600x900*.jpg' -f $Id
     $LibraryImagePath = Join-Path $SteamLibaryCache -ChildPath $ImageName
     if ( -not ( Test-Path-Verbose -Path $LibraryImagePath ) ) {
         Return $null
     }
     $CopyTo = Join-Path -Path $SaveImagesTo -ChildPath "$Id.jpg"
-    if ( -not ( $OverwriteImage -and ( Test-Path-Verbose -Path $CopyTo ) ) ) {
+    if ( ( -not  $OverwriteImage ) -and ( Test-Path-Verbose -Path $CopyTo ) ) {
         Write-Warning "Skipped overwriting ""$CopyTo"" with ""$LibraryImagePath""."
         Write-Warning 'Use -OverwriteImage if you want to overwrite images.'
-        Return $null
+        Return $CopyTo
     }
     Copy-Item $LibraryImagePath -Destination $CopyTo
     Return $CopyTo
