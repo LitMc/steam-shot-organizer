@@ -5,11 +5,15 @@ param (
     [string]$Destination = "$PSScriptRoot\links",
     [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
     [string]$Config = "$PSScriptRoot\config.yaml",
+    [string]$SaveImagesTo = "$PSScriptRoot\icon_source_images\",
     [switch]$OverwriteLink,
-    [switch]$OverwriteConfig
+    [switch]$OverwriteConfig,
+    [switch]$OverwriteImage
 )
 $Verbose = $PSCmdlet.MyInvocation.BoundParameters['Verbose']
 $Debug = $PSCmdlet.MyInvocation.BoundParameters['Debug']
+# This cache directory has asset images for Steam library
+$SteamLibaryCache = (Join-Path -Path $SteamDirectory -ChildPath 'appcache\librarycache')
 
 $DefaultConfigYamlText = @'
 # Configuration structure
@@ -49,6 +53,19 @@ function Exit-With-Success {
     exit 0
 }
 
+# Test a path and print some messages
+function Test-Path-Verbose {
+    param(
+        $Path
+    )
+    if ( -not ( Test-Path -Path $Path ) ) {
+        Write-Warning "Cannot find an icon source image at ""$Path""."
+        Write-Warning "Please confirm ""$Path"" can be opened with Explorer."
+        Return $false
+    }
+    Return $true
+}
+
 function Get-SanitizedTitle {
     param(
         [string] $Title
@@ -62,11 +79,18 @@ function Get-SanitizedTitle {
     Return $SanitizedTitle
 }
 
+
 # Retrieve game info such as title and banner image URL from Steam Web API
+# Memoize game information
+$GameInfoMemo = @{}
 function Get-GameInfo {
     param(
         [string] $Id
     )
+    if ( $GameInfoMemo.Contains($Id) ) {
+        Write-Host ("Found game information in cache. ID: ""$Id""")
+        Return $GameInfoMemo[$Id]
+    }
     $RequestUri = "https://store.steampowered.com/api/appdetails?appids=$Id"
     Write-Host "Invoke a web request to: $RequestUri"
 
@@ -81,6 +105,7 @@ function Get-GameInfo {
     if ( $Verbose -or $Debug ) {
         Write-Debug $Result
     }
+    $GameInfoMemo[$Id] = $Result
     Return $Result
 }
 
@@ -160,6 +185,102 @@ function Get-GameTitle {
     Return $Title
 }
 
+# Retrieve an icon image from user-defined path in config
+function Get-ImageFromConfig {
+    param(
+        [string]$Id
+    )
+    if ( -not $ParsedConfig.Contains($Id) ) {
+        Return $null
+    }
+    if ( -not $ParsedConfig[$Id].Contains('image') ) {
+        Return $null
+    }
+ 
+    Write-Host 'Found an icon image path in config.'
+    Write-Host "ID: ""$Id"""
+    Write-Host ('Title: {0}' -f $ParsedConfig[$Id]['title'].ToString())
+    Write-Host ('Image: {0}' -f $ParsedConfig[$Id]['image'])
+    $ReturnPath = $ParsedConfig[$Id]['image'].ToString()
+    if ( -not ( Test-Path -Path $ReturnPath ) ) {
+        Write-Error "Cannot find an icon source image at ""$ReturnPath""."
+        Write-Error "Please confirm ""$ReturnPath"" can be opened with Explorer."
+        Return $null
+    }
+    Return $ReturnPath
+}
+
+# Retrieve an icon image from Steam local library cache
+function Get-ImageFromSteamLibrary {
+    param(
+        [string]$Id
+    )
+    # Almost all games have this 600x900 Portrait image
+    $ImageName = '{0}_library_600x900.jpg' -f $Id
+    $LibraryImagePath = Join-Path $SteamLibaryCache -ChildPath $ImageName
+    if ( -not ( Test-Path-Verbose -Path $LibraryImagePath ) ) {
+        Return $null
+    }
+    $CopyTo = Join-Path -Path $SaveImagesTo -ChildPath "$Id.jpg"
+    if ( -not ( $OverwriteImage -and ( Test-Path-Verbose -Path $CopyTo ) ) ) {
+        Write-Warning "Skipped overwriting ""$CopyTo"" with ""$LibraryImagePath""."
+        Write-Warning 'Use -OverwriteImage if you want to overwrite images.'
+        Return $null
+    }
+    Copy-Item $LibraryImagePath -Destination $CopyTo
+    Return $CopyTo
+}
+
+# Retrieve an icon image from Steam Web API
+function Get-ImageFromWeb {
+    param(
+        [string]$Id
+    )
+    $GameInfo = Get-GameInfo -Id $Id
+    $ImageUri = ($GameInfo.Content | jq ('."{0}".data.header_image' -f $Id)) -replace '"'
+    $ReturnPath = Join-Path -Path $SaveImagesTo -ChildPath "$Id.jpg"
+    
+    # Invoke-WebRequest has no return values when -OutFile is enabled
+    try {
+        Invoke-WebRequest -Uri $ImageUri -Headers @{'Cache-Control' = 'no-cache' } -OutFile $ReturnPath
+    } catch {
+        Write-Warning $PSItem.Exception.Message
+        Write-Warning "Please confirm ""$ImageUri"" can be opened with web browsers."
+        Return $null
+    }
+    Return $ReturnPath
+}
+
+function Get-Image {
+    param(
+        [string]$Id
+    )
+    $ImagePath = Get-ImageFromConfig -Id $Id
+    if ( $null -ne $ImagePath ) {
+        Write-Host 'Image defined in config will be used for an icon.'
+        Return $ImagePath
+    }
+
+    $ImagePath = Get-ImageFromSteamLibrary -Id $Id
+    if ( $null -ne $ImagePath ) {
+        if ( $OverwriteConfig ) {
+            $ParsedConfig[$Id]['image'] = $ImagePath
+        }
+        Write-Host 'Image in steam library cache will be used for an icon.'
+        Return $ImagePath
+    }
+
+    $ImagePath = Get-ImageFromWeb -Id $Id
+    if ( $null -ne $ImagePath ) {
+        if ( $OverwriteConfig ) {
+            $ParsedConfig[$Id]['image'] = $ImagePath
+        }
+        Write-Host 'Image from Steam Web API will be used for an icon.'
+        Return $ImagePath
+    }
+    Return $null
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                     : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory        : $Source"
@@ -205,6 +326,14 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
 
     # Remove invalid characters for a file name from title
     $SanitizedTitle = Get-SanitizedTitle -Title $Title
+
+    # Get a source icon image path (*.jpg or *.png)
+    # When no images in a local directory, then a web request will be invoked to download images
+    $ImagePath = Get-Image -Id $Id
+
+    if ( $null -eq $ImagePath ) {
+        # No available images for icons
+    }
 
     # Get and test SourceScreenshotPath
     $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
