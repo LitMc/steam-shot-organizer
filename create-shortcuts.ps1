@@ -5,7 +5,7 @@ param (
     [string]$Destination = "$PSScriptRoot\links",
     [string]$Source = (Join-Path -Path $SteamDirectory -ChildPath 'userdata\*\760\remote'),
     [string]$Config = "$PSScriptRoot\config.yaml",
-    [string]$SaveImagesTo = "$PSScriptRoot\icon_source_images\",
+    [string]$SaveImagesTo = "$PSScriptRoot\images\",
     [switch]$OverwriteLink,
     [switch]$OverwriteConfig,
     [switch]$OverwriteImage
@@ -163,12 +163,22 @@ function Set-ConfigToYaml {
     }
 }
 
+function Write-GameInfo {
+    param(
+        [string]$Id,
+        [string]$Title
+    )
+    Write-Host 'ID: ' -NoNewline
+    Write-Host $Id -ForegroundColor Cyan
+    Write-Host 'Title: ' -NoNewline
+    Write-Host $Title -ForegroundColor Cyan
+}
+
 function Get-GameTitle {
     param(
         [string]$Id
     )
     if ( $ParsedConfig.Contains($Id) -and $ParsedConfig[$Id].Contains('title') ) {
-        Write-Host ("Found a title in config. ID: ""$Id"" Title: {0}" -f $ParsedConfig[$Id]['title'].ToString())
         Return $ParsedConfig[$Id]['title']
     }
     $Result = Get-GameInfo -Id $Id
@@ -176,8 +186,6 @@ function Get-GameTitle {
     $QueryGameTitle = ([string]::Format('."{0}".data.name', $Id))
     # Example: "Portal" -> Portal
     $Title = ($Result.Content | jq $QueryGameTitle) -replace '"'
-    Write-Host "Game ID   : $Id"
-    Write-Host "Game title: $Title"
     if ( -not $ParsedConfig.Contains($Id) ) {
         $ParsedConfig[$Id] = @{}
     }
@@ -191,6 +199,7 @@ function Get-ImageFromConfig {
         [string]$Id
     )
     if ( -not $ParsedConfig.Contains($Id) ) {
+        $ParsedConfig[$Id] = @{}
         Return $null
     }
     if ( -not $ParsedConfig[$Id].Contains('image') ) {
@@ -198,8 +207,6 @@ function Get-ImageFromConfig {
     }
  
     Write-Host 'Found an icon image path in config.'
-    Write-Host "ID: ""$Id"""
-    Write-Host ('Title: {0}' -f $ParsedConfig[$Id]['title'].ToString())
     Write-Host ('Image: {0}' -f $ParsedConfig[$Id]['image'])
     $ReturnPath = $ParsedConfig[$Id]['image'].ToString()
     if ( -not ( Test-Path -Path $ReturnPath ) ) {
@@ -281,6 +288,26 @@ function Get-Image {
     Return $null
 }
 
+function Set-Shortcut {
+    param(
+        [string] $SourcePath,
+        [string] $DestinationPath
+    )
+    $IsSuccessed = $false
+    try {
+        $WScriptShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WScriptShell.CreateShortcut($DestinationLinkPath)
+        $Shortcut.TargetPath = $SourceScreenshotPath
+        $Shortcut.Save()
+        $IsSuccessed = $true
+    } catch {
+        Write-Error $_
+    } finally {
+        [System.Runtime.Interopservices.Marshal]::ReleaseComObject($WScriptShell) | Out-Null
+    }
+    Return $IsSuccessed
+}
+
 # Print parameters to console
 Write-Host "[inputs] Steam directory                : $SteamDirectory"
 Write-Host "[inputs] Source screenshots directory   : $Source"
@@ -316,16 +343,14 @@ Write-Host 'Start mapping id to game title...'
 # GameIdDirectory Example: C:\Program Files (x86)\Steam\userdata\{some numbers}\760\remote\400
 foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     Write-Host ''
-    Write-Host ('Target: {0}' -f $GameIdDirectory.FullName) -ForegroundColor DarkCyan
+    Write-Host ('Target: {0}' -f $GameIdDirectory.FullName)
 
     # Id Example: 400
     $Id = ($GameIdDirectory | Select-Object Name).Name
-
     # Title Example: Portal
     $Title = Get-GameTitle -Id $Id
-
-    # Remove invalid characters for a file name from title
-    $SanitizedTitle = Get-SanitizedTitle -Title $Title
+    
+    Write-GameInfo -Id $Id -Title $Title
 
     # Get a source icon image path (*.jpg or *.png)
     # When no images in a local directory, then a web request will be invoked to download images
@@ -338,10 +363,10 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
     # Get and test SourceScreenshotPath
     $SourceScreenshotPath = Get-SourceScreenshotPath -Id $Id -GameIdDirectory $GameIdDirectory
 
-    # Skip creating a shortcuts if a destination link already exists
-    $DestinationLinkPath = Join-Path -Path $Destination -ChildPath $SanitizedTitle
+    # Skip creating a shortcut if a destination link already exists
+    $DestinationLinkPath = Join-Path -Path $Destination -ChildPath "$Id.lnk"
     if ( ( Test-Path -Path $DestinationLinkPath ) ) {
-        Write-Warning "A shortcuts ""$DestinationLinkPath"" already exists."
+        Write-Warning "A shortcut ""$DestinationLinkPath"" already exists."
         if ( $OverwriteLink ) {
             Write-Host 'Overwrite a link with a new one.'
             Write-Host "Old source : ""$((Get-Item $DestinationLinkPath).LinkTarget)"""
@@ -356,20 +381,25 @@ foreach ( $GameIdDirectory in Get-ChildItem $ResolvedSource ) {
         Write-Host "Destination: $DestinationLinkPath"
     }
 
-    # Create a shortcuts
-    if ( $OverwriteLink ) {
-        $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath -Force
-    } else {
-        $LinkResult = New-Item -ItemType SymbolicLink -Path $DestinationLinkPath -Target $SourceScreenshotPath
-    }
+    # Create a shortcut
+    $LinkResult = Set-Shortcut -SourcePath $SourceScreenshotPath -DestinationPath $DestinationLinkPath
 
     if ( $LinkResult ) {
-        Write-Host "Create a shortcuts successfully: $DestinationLinkPath" -ForegroundColor DarkGreen
+        # Remove invalid characters for a file name from title
+        $SanitizedTitle = Get-SanitizedTitle -Title $Title
+
+        # Rename {Game ID}.lnk to {Game title}.lnk and remove an old one
+        $OldShortcut = Join-Path -Path $Destination -ChildPath "$SanitizedTitle.lnk"
+        if ( Test-Path -Path $OldShortcut ) {
+            Remove-Item $OldShortcut
+        }
+        Rename-Item (Join-Path -Path $Destination -ChildPath "$Id.lnk") "$SanitizedTitle.lnk"
     } else {
-        Write-Error "Cannot create a shortcuts: $DestinationLinkPath"
+        Write-Error "Cannot create a shortcut: $DestinationLinkPath"
         Write-Error "Please confirm the directory ""$Destination"" can be opened with Explorer."
         Exit-With-Error
     }
+    Write-Host "Created a shortcut successfully: $SanitizedTitle.lnk" -ForegroundColor DarkGreen
 }
 Write-Host 'Finished mapping game IDs to game titles.'
 
