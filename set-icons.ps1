@@ -110,12 +110,15 @@ Vid=
 
     Write-Host "Finished modifying ""$DesktopIniPath""."
 }
+Write-Host ''
 Write-Host 'Finished modifying desktop.ini of all screenshots folders.'
 
 $Prompt = @'
 To apply the changes, you must restart explorer.exe or your computer.
-Caution: When Explorer is restarted, all open file and folder windows will be closed.
-         Save all working data before restarting.
+
+Caution:
+When Explorer is restarted, all open file and folder windows will be closed.
+Save all working data before restarting.
 
 Do you want to restart explorer.exe? (y/N)
 '@
