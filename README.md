@@ -1,12 +1,12 @@
 # steam-shot-organizer
-SteamShotOrganizer is a collection of PowerShell scripts for Windows to easily open Steam game screenshots folders without an official manager.
-It aggregates screenshots from screenshots directories into a single location while maintains the original files' integrity by using shortcuts.
+SteamShotOrganizer is a collection of PowerShell scripts for Windows to easily open Steam screenshots folders without an official manager.
+It aggregates screenshots folders into a single location while maintains the original files' integrity by using shortcuts.
 
 ## Prerequisites (TBD)
 Some softwares have to be installed to run scripts.
 Since there are no dependency management tools, you need install them manually. I am sorry for that.
 
-### Install requirements (TBD)
+### Install dependencies (TBD)
 
 ### Clone this repository
 ```
