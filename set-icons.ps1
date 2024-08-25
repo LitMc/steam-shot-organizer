@@ -1,7 +1,8 @@
 param(
     [string]$SteamDirectory = 'C:\Program Files (x86)\Steam',
     [string]$IconDirectory = (Join-Path $PSScriptRoot -ChildPath 'icons'),
-    [switch]$Restore
+    [switch]$Restore,
+    [switch]$YesToAll
 )
 # Save the current encoding and switch to UTF-8.
 # To treat these characters correctly: ™, ひらがな
@@ -122,7 +123,7 @@ Save all working data before restarting.
 
 Do you want to restart explorer.exe? (y/N)
 '@
-$Answer = Read-Host $Prompt
+$Answer = $YesToAll -or (Read-Host $Prompt)
 
 if ( $Answer -in @('Y', 'y') ) {
     # Restart explorer.exe to apply changes
